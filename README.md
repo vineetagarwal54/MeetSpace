@@ -7,8 +7,6 @@ MeetSpace is a modern, real-time video conferencing application that enables sea
 ![Home](docs/screenshots/HomeScreen.png)
 ![Room](docs/screenshots/RoomScreenShare.png)
 
-> Tip: keep images small (compressed PNG/JPG). For large/binary media, consider Git LFS.
-
 ## ✨ Features
 
 - **Video Conferencing**
@@ -144,9 +142,6 @@ The application will be available at `http://localhost:3000`
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -160,9 +155,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Contact
 
-Your Name - your.email@example.com
-Project Link: [https://github.com/yourusername/meetspace](https://github.com/yourusername/meetspace)
+Email - vineetagarwal540@gmail.com 
 
----
-
-Made with ❤️ by [Your Name]
