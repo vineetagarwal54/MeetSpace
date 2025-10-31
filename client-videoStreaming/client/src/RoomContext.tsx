@@ -25,14 +25,14 @@ interface RoomContextType {
   ws: any;
   me: Peer | undefined;
   stream: MediaStream | undefined;
-  screenStream: MediaStream | undefined;
+    screenStream: MediaStream | null;
   peers: any;
   chat: any;
-  shareScreen: () => void;
+  shareScreen: () => Promise<void>;
   screenSharingId: string;
   setRoomId: (id: string) => void;
-  toggleVideo: () => void;
-  toggleAudio: () => void;
+  toggleVideo: () => Promise<void>;
+  toggleAudio: () => Promise<void>;
   isVideoOn: boolean;
   isAudioOn: boolean;
   sendMessage: (message: string) => void;
@@ -57,7 +57,7 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
   );
   const [isVideoOn, setIsVideoOn] = useState<boolean>(true);
   const [isAudioOn, setIsAudioOn] = useState<boolean>(true);
-  const [screenStream, setScreenStream] = useState<MediaStream>();
+    const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [userId, setUserId] = useState<any>()
   const [stream, setStream] = useState<MediaStream>();
   const [peers, dispatch] = useReducer(peersReducer, {});
@@ -69,20 +69,60 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
     messages: [],
     isChatOpen: false,
   });
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
+  const toggleVideo = async () => {
+    if (!stream) {
+      // No stream exists, try to initialize one
+      await initializeMediaStream(true);
+      return;
+    }
+
+    const videoTracks = stream.getVideoTracks();
+    if (videoTracks.length === 0) {
+      // No video track exists, try to get video access
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        stream.addTrack(newVideoTrack);
+        newVideoTrack.enabled = true;
+        setIsVideoOn(true);
+        dispatch(updateVideoAction(me?.id || "", true));
+        localStorage.setItem("isVideoOn", "true");
+        setIsAudioOnly(false);
+      } catch (error) {
+        console.error("Could not enable video:", error);
+        setDeviceError("Could not access camera. Please check your device permissions.");
+      }
+      return;
+    }
+
+    // We have a video track, toggle it
+    const videoTrack = videoTracks[0];
+    try {
       videoTrack.enabled = !videoTrack.enabled;
       dispatch(updateVideoAction(me?.id || "", videoTrack.enabled));
       setIsVideoOn(videoTrack.enabled);
       localStorage.setItem("isVideoOn", videoTrack.enabled ? "true" : "false");
+    } catch (error) {
+      console.error("Error toggling video:", error);
+      setDeviceError("Error toggling video. Please try reloading the page.");
     }
   };
 
 
-  const toggleAudio = () => {
-    if (stream) {
-      const audioTracks = stream.getAudioTracks();
+  const toggleAudio = async (): Promise<void> => {
+    if (!stream) {
+      try {
+        // Try to initialize stream with audio only
+        await initializeMediaStream(false);
+      } catch (error) {
+        console.error("Could not initialize audio stream:", error);
+        setDeviceError("Could not access microphone. Please check your device permissions.");
+        return;
+      }
+    }
+
+    try {
+      const audioTracks = stream?.getAudioTracks() || [];
       if (audioTracks.length > 0) {
         const currentAudioState = audioTracks[0].enabled;
         audioTracks.forEach((audioTrack) => {
@@ -95,7 +135,19 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
           "isAudioOn",
           currentAudioState ? "true" : "false"
         );
+      } else {
+        // No audio tracks, try to get audio access
+        const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newAudioTrack = newStream.getAudioTracks()[0];
+        stream?.addTrack(newAudioTrack);
+        newAudioTrack.enabled = true;
+        setIsAudioOn(true);
+        dispatch(updateAudioAction(me?.id || "", true));
+        localStorage.setItem("isAudioOn", "true");
       }
+    } catch (error) {
+      console.error("Error toggling audio:", error);
+      setDeviceError("Could not access microphone. Please check your device permissions.");
     }
   };
 
@@ -114,46 +166,93 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
     dispatch(removePeerAction(peerId));
   };
 
-  const switchStream = (stream: MediaStream) => {
-    // setStream(stream);
-    setScreenSharingId(me?.id || "");
+  const switchStream = async (newStream: MediaStream): Promise<void> => {
+    if (!me || !me.connections) {
+      throw new Error("Peer connection not established");
+    }
 
-    // Defensive: ensure Peer connections exist and that senders/tracks are present
-    if (!me || !me.connections) return;
-    Object.values(me.connections).forEach((connectionArr: any) => {
-      const connection = Array.isArray(connectionArr) ? connectionArr[0] : connectionArr;
-      if (!connection || !connection.peerConnection) return;
-      const videoTrack: any = stream?.getTracks().find((track) => track.kind === "video");
-      try {
-        const senders = connection.peerConnection.getSenders?.() || [];
-        const sender = senders.find((s: any) => s.track && s.track.kind === "video");
-        if (sender && videoTrack) {
-          sender.replaceTrack(videoTrack).catch((err: any) => console.error("replaceTrack error", err));
+    const videoTrack = newStream?.getTracks().find(track => track.kind === "video");
+    if (!videoTrack) {
+      throw new Error("No video track found in the stream");
+    }
+
+    // Set screen sharing ID before replacing tracks
+    setScreenSharingId(me.id || "");
+
+    const promises = Object.values(me.connections).map(async (connectionArr: any) => {
+      const connections = Array.isArray(connectionArr) ? connectionArr : [connectionArr];
+      
+      for (const connection of connections) {
+        if (!connection?.peerConnection) continue;
+
+        try {
+          const senders = connection.peerConnection.getSenders() || [] as RTCRtpSender[];
+          const sender = senders.find((s: RTCRtpSender) => s.track?.kind === "video");
+          
+          if (sender) {
+            await sender.replaceTrack(videoTrack);
+            console.log("Track replaced successfully for peer");
+          } else {
+            console.warn("No video sender found in peer connection");
+          }
+        } catch (err) {
+          console.error("Error replacing track:", err);
+          throw err;
         }
-      } catch (err) {
-        console.error("Error replacing track:", err);
       }
     });
+
+    try {
+      await Promise.all(promises);
+      console.log("Stream switched successfully for all peers");
+    } catch (error) {
+      console.error("Error switching stream:", error);
+      throw error;
+    }
   };
 
-  const shareScreen = () => {
-    if (screenSharingId) {
-      navigator.mediaDevices
-        .getUserMedia({ video: true, audio: true })
-        .then(switchStream)
-        .catch((error) => {
-          console.error("Error accessing media devices:", error);
+  const shareScreen = async (): Promise<void> => {
+    try {
+      if (screenSharingId) {
+        // Stop screen sharing
+        if (screenStream) {
+          screenStream.getTracks().forEach(track => track.stop());
+          setScreenStream(null);
+        }
+        // Switch back to camera stream
+        if (stream) {
+          await switchStream(stream);
+          setScreenSharingId("");
+          ws.emit("stop-sharing");
+        }
+      } else {
+        // Start screen sharing
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: false
         });
-    } else {
-      navigator.mediaDevices
-        .getDisplayMedia({})
-        .then((stream) => {
-          switchStream(stream);
-          setScreenStream(stream)
-        })
-        .catch((error) => {
-          console.error("Error accessing display media:", error);
-        });
+
+        // Listen for when user stops sharing via browser controls
+        displayStream.getVideoTracks()[0].onended = () => {
+          if (stream) {
+            switchStream(stream).catch(console.error);
+              setScreenStream(null);
+            setScreenSharingId("");
+            ws.emit("stop-sharing");
+          }
+        };
+
+        await switchStream(displayStream);
+        setScreenStream(displayStream);
+        ws.emit("start-sharing", { peerId: me?.id, roomId });
+      }
+    } catch (error) {
+      console.error("Error with screen sharing:", error);
+      const errorMessage = error instanceof Error && error.name === 'NotAllowedError'
+        ? 'Screen sharing was denied. Please grant permission to share your screen.'
+        : 'Could not start screen sharing. Please try again.';
+      setDeviceError(errorMessage);
+      throw error;
     }
   };
 
