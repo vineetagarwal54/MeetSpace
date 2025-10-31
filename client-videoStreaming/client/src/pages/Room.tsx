@@ -198,12 +198,18 @@ export const Room = () => {
   
 
   useEffect(() => {
-    if (me )
-      me.on("open", () => {
-        ws.emit("join-room", { roomId: id, peerId: me?.id });
-      });
-    // }); me.emit("join-room",{roomId:id, peerId:me._id})
-  }, [id, ws, me]);
+    if (!me) return;
+    const emitJoin = () => ws.emit("join-room", { roomId: id, peerId: me.id, userName });
+    if ((me as any).open) {
+      // already open
+      emitJoin();
+    } else {
+      me.on("open", emitJoin);
+    }
+    return () => {
+      try { me.off?.("open", emitJoin as any); } catch {}
+    };
+  }, [id, ws, me, userName]);
 
   useEffect(() => {
     setRoomId(id || "");

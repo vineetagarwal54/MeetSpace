@@ -69,6 +69,8 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
     messages: [],
     isChatOpen: false,
   });
+  // Keep the latest participants list so we can connect once media/peer are ready
+  const [participantsSnapshot, setParticipantsSnapshot] = useState<Record<string, any>>({});
   const toggleVideo = async () => {
     if (!stream) {
       // No stream exists, try to initialize one
@@ -151,16 +153,93 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
     }
   };
 
-  const enterRoom = ({ roomId }: { roomId: "string" }) => {
+  const enterRoom = ({ roomId }: { roomId: string }) => {
     navigate(`/room/${roomId}`);
   };
 
-  const leftRoom = ({ roomId }: { roomId: "string" }) => {
-    navigate("/");
+  // handle user-left-room payloads from server.
+  // Server emits { roomId, peerId } (or older clients may send a plain string peerId).
+  const leftRoom = (payload: any) => {
+    try {
+      let peerId: string | undefined;
+      let rId: string | undefined;
+
+      if (!payload) {
+        // nothing to do
+      } else if (typeof payload === "string") {
+        peerId = payload;
+      } else if (typeof payload === "object") {
+        peerId = payload.peerId || payload;
+        rId = payload.roomId;
+      }
+
+      // Remove the peer from our local state if we know the id
+      if (peerId) {
+        try {
+          dispatch(removePeerAction(peerId));
+        } catch (err) {
+          console.warn("Could not remove peer from state", err);
+        }
+      }
+
+      // If this event indicates the local user left (or no roomId provided), navigate home
+      // The leaving client will also receive this; ensure it navigates back.
+      if (!rId || rId === roomId) {
+        navigate("/");
+      }
+    } catch (err) {
+      console.error("Error handling leftRoom event:", err);
+      navigate("/");
+    }
   };
-  const getUsers = ({ participants }: { participants: string[] }) => {
-    console.log({ participants });
+  const getUsers = (payload: any) => {
+    try {
+      const participants = payload?.participants || {};
+      console.log("get-users payload:", participants);
+      setParticipantsSnapshot(participants);
+
+      // If media and peer are ready, try to connect immediately
+      if (me && stream) {
+        Object.keys(participants).forEach((peerId) => {
+          if (!peerId || peerId === me.id) return;
+          if ((peers || {})[peerId]) return;
+
+          try {
+            const call = me.call(peerId, stream, { metadata: { userName } });
+            call.on("stream", (peerStream: MediaStream) => {
+              dispatch(addPeerAction(peerId, peerStream));
+            });
+            const name = participants[peerId]?.userName;
+            if (name) dispatch(addPeerNameAction(peerId, name));
+          } catch (err) {
+            console.warn("Could not call existing participant", peerId, err);
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Error processing get-users payload", err);
+    }
   };
+
+  // Once we have both peer and media ready, if we already received participants, connect now
+  useEffect(() => {
+    if (!me || !stream) return;
+    const participants = participantsSnapshot || {};
+    Object.keys(participants).forEach((peerId) => {
+      if (!peerId || peerId === me.id) return;
+      if ((peers || {})[peerId]) return;
+      try {
+        const call = me.call(peerId, stream, { metadata: { userName } });
+        call.on("stream", (peerStream: MediaStream) => {
+          dispatch(addPeerAction(peerId, peerStream));
+        });
+        const name = participants[peerId]?.userName;
+        if (name) dispatch(addPeerNameAction(peerId, name));
+      } catch (err) {
+        console.warn("Could not call existing participant on readiness", peerId, err);
+      }
+    });
+  }, [me, stream, participantsSnapshot]);
 
   const removePeer = (peerId: string) => {
     dispatch(removePeerAction(peerId));
@@ -334,10 +413,11 @@ export const RoomProvider: React.FunctionComponent<any> = ({ children }) => {
   // registering socket listeners and peer creation — keep stable for provider lifecycle
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    const saveId = localStorage.getItem("userId");
-    const meId = saveId || uuidV4();
-    setUserId(meId)
-    localStorage.setItem("userId", meId);
+    // Use sessionStorage so each tab gets a unique PeerJS id.
+    const savedSessionId = sessionStorage.getItem("sessionUserId");
+    const meId = savedSessionId || uuidV4();
+    setUserId(meId);
+    sessionStorage.setItem("sessionUserId", meId);
     const peer = new Peer(meId, {
       host: "localhost",
       port: 9002,

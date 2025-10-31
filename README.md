@@ -2,7 +2,12 @@
 
 MeetSpace is a modern, real-time video conferencing application that enables seamless communication through high-quality video calls, screen sharing, and instant messaging. Built with React, TypeScript, and WebRTC, it provides a user-friendly interface similar to Google Meet while maintaining high performance and reliability.
 
-![MeetSpace Screenshot](screenshot.png)
+## 📸 Screenshots
+
+![Home](docs/screenshots/HomeScreen.png)
+![Room](docs/screenshots/RoomScreenShare.png)
+
+> Tip: keep images small (compressed PNG/JPG). For large/binary media, consider Git LFS.
 
 ## ✨ Features
 

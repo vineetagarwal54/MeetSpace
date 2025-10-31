@@ -1,3 +1,15 @@
+
+# Client App – Screenshots
+
+Add client-specific screenshots under `docs/screenshots/` (preferred) or `public/screenshots/` within this package.
+
+Examples from this README location:
+
+- Using client docs folder: `![Home](docs/screenshots/home.png)`
+- Using public folder: `![Home](public/screenshots/home.png)`
+
+---
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

@@ -65,8 +65,9 @@ export const roomHandler = (socket: Socket) => {
       delete rooms[roomId][peerId];
     }
 
-    // notify the leaving client and other participants
-    socket.emit("user-left-room", peerId);
+  // notify the leaving client and other participants
+  // emit an object so clients receive a consistent payload shape
+  socket.emit("user-left-room", { roomId, peerId });
     socket.to(roomId).emit("user-disconnected", peerId);
 
     // emit updated participants
