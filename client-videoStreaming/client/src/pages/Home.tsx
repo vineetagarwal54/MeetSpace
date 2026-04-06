@@ -1,70 +1,61 @@
-import React, { useContext, useState } from 'react'
-import {CreateButton} from '../components/CreateButton'
-import { RoomContext } from '../RoomContext';
-import image from "./4Z_2101.w017.n001.346B.p15.346.jpg"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { CreateButton } from "../components/CreateButton";
 
 export const Home = () => {
-  const [meetCode, setMeetCode] = useState('');
+  const [meetCode, setMeetCode] = useState("");
+  const navigate = useNavigate();
 
-  const handleMeetCodeChange = (e: { target: { value: React.SetStateAction<string>; }; }) => {
-    setMeetCode(e.target.value);
-  };
-
-  const {ws, me} = useContext(RoomContext);
-
-   
   const handleJoinClick = () => {
-    ws.emit("join-room", { roomId: meetCode, peerId: me?.id });
+    if (!meetCode.trim()) return;
+    navigate(`/room/${meetCode.trim()}`);
   };
 
-//   return (
-//     <div className="App flex col items-center justify-center w-screen h-screen">
-//       <input
-//         type="text"
-//         placeholder="Enter Meet Code"
-//         value={meetCode}
-//         onChange={handleMeetCodeChange}
-//       />
-//       <div className='bg-rose-400 hover:bg-rose-600 text-white font-bold py-2 px-8 rounded'>
-//       <button onClick={handleJoinClick}>Join</button>
-//       </div>
-//     <CreateButton/>
-// </div>
-//   )
-return (
-  <div
-    className="App flex items-center justify-center w-screen min-h-screen p-6"
-    style={{ backgroundImage: `url(${image})`, backgroundRepeat: "no-repeat", backgroundSize: "contain" }}
-  >
-    <div className="w-full max-w-4xl">
-      <h1 className="text-3xl md:text-4xl font-bold mb-8 text-center">Video Conferencing</h1>
-
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/60 p-6 rounded-lg shadow-md">
-        {/* New Meeting */}
-        <div className="w-full md:w-1/2 flex items-start md:items-center gap-4">
-          <CreateButton />
+  return (
+    <div className="flex items-center justify-center w-screen min-h-screen bg-gray-900">
+      <div className="w-full max-w-lg px-6">
+        {/* Logo / Title */}
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-white mb-2">MeetSpace</h1>
+          <p className="text-gray-400">Video conferencing for everyone</p>
         </div>
 
-        {/* Join */}
-        <div className="w-full md:w-1/2 flex justify-end">
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <input
-              type="text"
-              placeholder="Enter Meet Code"
-              value={meetCode}
-              onChange={handleMeetCodeChange}
-              className="border border-gray-300 p-2 rounded w-full sm:w-64"
-            />
-            <button
-              onClick={handleJoinClick}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded w-full sm:w-auto"
-            >
-              Join
-            </button>
+        <div className="bg-gray-800 rounded-2xl p-8 shadow-xl space-y-6">
+          {/* New Meeting */}
+          <div>
+            <h2 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">
+              Start a new meeting
+            </h2>
+            <CreateButton />
+          </div>
+
+          <div className="border-t border-gray-700" />
+
+          {/* Join existing */}
+          <div>
+            <h2 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">
+              Join a meeting
+            </h2>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                placeholder="Enter room code"
+                value={meetCode}
+                onChange={(e) => setMeetCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleJoinClick()}
+                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400"
+              />
+              <button
+                onClick={handleJoinClick}
+                disabled={!meetCode.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
+              >
+                Join
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
-}
+  );
+};

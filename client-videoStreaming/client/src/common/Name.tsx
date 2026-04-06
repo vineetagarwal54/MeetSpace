@@ -1,13 +1,12 @@
-import React, { useContext } from "react";
+import { useContext } from "react";
 import { RoomContext } from "../RoomContext";
 
 export default function NameInput() {
   const { userName, setUserName } = useContext(RoomContext);
   return (
-    // <div>NameInput</div>
     <input
-      className="border rounded-md p-2 h-10 my-2"
-      placeholder="Enter your Name"
+      className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400"
+      placeholder="Your name"
       onChange={(e) => setUserName(e.target.value)}
       value={userName}
     />
