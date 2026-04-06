@@ -1,0 +1,20 @@
+{
+  "name": "meetspace",
+  "version": "1.0.0",
+  "description": "Real-time video conferencing app",
+  "scripts": {
+    "install:client": "cd client-videoStreaming/client && npm install",
+    "install:server": "cd server-videoStreaming/server && npm install",
+    "install:all": "npm run install:client && npm run install:server",
+    "build:client": "cd client-videoStreaming/client && npm run build",
+    "build:server": "cd server-videoStreaming/server && npm run build",
+    "build": "npm run build:client && npm run build:server",
+    "start": "cd server-videoStreaming/server && npm start",
+    "dev:client": "cd client-videoStreaming/client && npm start",
+    "dev:server": "cd server-videoStreaming/server && npm run dev",
+    "postinstall": "npm run install:all"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
